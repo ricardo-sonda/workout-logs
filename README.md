@@ -8,7 +8,7 @@ This is how strong I've been getting since January 2025, charted from text files
 
 One chart per exercise, grouped by Torso / Arms / Legs. Each dot is a session. The line is a rolling average, so a single bad day doesn't count. Several bad days do.
 
-The score is an estimated 1-rep max (or volume, or top weight; there's a dropdown). The first set of a session counts most and later sets count less, because the first set is who I am and the later ones are who I become.
+The score is an estimated 1-rep max (or volume, or top weight; there's a dropdown). The first set of a session counts most and later sets count less. Some structural shifts in machine-based exercises are due to different machines claiming different numbers for the same tension. 
 
 ## Market commentary
 
