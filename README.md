@@ -8,7 +8,7 @@ This is how strong I've been getting since January 2025, charted from text files
 
 One chart per exercise, grouped by Torso / Arms / Legs. Each dot is a session. The line is a rolling average, so a single bad day doesn't count. Several bad days do.
 
-The score is an estimated 1-rep max (or volume, or top weight; there's a dropdown). The first set of a session counts most and later sets count less, because the first set is who I am and the later ones are who I become.
+The score is an estimated 1-rep max (or volume, or top weight; there's a dropdown). The first set of a session counts most and later sets count less. Some structural shifts in machine-based exercises are due to different machines claiming different numbers for the same tension. 
 
 ## Market commentary
 
@@ -23,11 +23,3 @@ The score is an estimated 1-rep max (or volume, or top weight; there's a dropdow
 **Legs: Sell.** The sector has been in a bear market since July 2025. *Squat* (−7%) and *Romanian Deadlift* (−8%) both peaked that summer and have been consolidating at lower levels for over a year, which is a polite way of saying they gave up. The exception is *Calf Raise*, up 213%, a gain the auditors have traced to a switch from dumbbells to a machine. Technically legal. *Leg Raise* is a machine and trades accordingly.
 
 **Watchlist.** *Push-Up* listed in August 2026 and went straight up on light volume, classic meme-stock behaviour. *Overhead Press* traded once and was never seen again.
-
-## Notes to future me
-
-- Log workouts in `data/Workout log YYYY.txt`. The format is in [parsing-info.md](parsing-info.md).
-- Run `python parse.py`, then commit and push `data.js`. The site updates by itself a minute later.
-- `parse.py` complains about lines it can't read. Listen to it.
-- Bodyweight is hardcoded at 78 kg, approximately, and selectively measured.
-- Exercises logged fewer than 8 times don't get a chart. Overhead press, I saw what you did.
