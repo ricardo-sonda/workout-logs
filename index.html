@@ -16,6 +16,7 @@
     --text-muted: #85847e;
     --series-1: #2a78d6;
     --dot: rgba(42, 120, 214, 0.28);
+    --sel: rgba(42, 120, 214, 0.12);
     --good: #1a7f37;
     --bad: #c4352f;
   }
@@ -31,6 +32,7 @@
       --text-muted: #8a897f;
       --series-1: #3987e5;
       --dot: rgba(57, 135, 229, 0.35);
+      --sel: rgba(57, 135, 229, 0.18);
       --good: #4cb86a;
       --bad: #e66767;
     }
@@ -46,6 +48,7 @@
     --text-muted: #8a897f;
     --series-1: #3987e5;
     --dot: rgba(57, 135, 229, 0.35);
+    --sel: rgba(57, 135, 229, 0.18);
     --good: #4cb86a;
     --bad: #e66767;
   }
@@ -77,6 +80,18 @@
   .control input[type=number]::-webkit-inner-spin-button { opacity: 1; }
   .hint { font-size: 12px; color: var(--text-muted); max-width: 320px; }
 
+  .ranges {
+    display: inline-flex; gap: 2px; padding: 2px;
+    background: var(--surface-0); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .ranges button {
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    background: none; border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  }
+  .ranges button:hover { color: var(--text-primary); }
+  .ranges button:focus:not(:focus-visible), .close:focus:not(:focus-visible) { outline: none; }
+  .ranges button[aria-pressed="true"] { background: var(--surface-1); color: var(--series-1); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
   h2 {
     font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
     color: var(--text-secondary); margin: 28px 0 10px;
@@ -90,12 +105,18 @@
     padding: 12px 12px 6px; cursor: zoom-in; position: relative; min-width: 0;
   }
   .card:hover { border-color: var(--text-muted); }
+  .card.empty { cursor: default; }
+  .card.empty:hover { border-color: var(--border); }
   .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .card-title { font-weight: 600; }
   .card-stat { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
   .delta.up { color: var(--good); }
   .delta.down { color: var(--bad); }
   .card-meta { font-size: 12px; color: var(--text-muted); }
+  .no-data {
+    height: 128px; display: grid; place-items: center;
+    color: var(--text-muted); font-size: 12px; font-style: italic;
+  }
 
   svg { display: block; width: 100%; height: auto; overflow: visible; }
   svg text { fill: var(--text-muted); font-size: 10px; }
@@ -104,6 +125,12 @@
   .pt { fill: var(--dot); }
   .pt.active { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
   .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 2 3; }
+  .sel { fill: var(--sel); }
+  .sel-edge { stroke: var(--series-1); stroke-width: 1; }
+  .tag-y rect { fill: var(--series-1); }
+  .tag-y text { fill: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tag-x rect { fill: var(--text-primary); }
+  .tag-x text { fill: var(--surface-1); font-weight: 600; }
 
   #tip {
     position: fixed; pointer-events: none; z-index: 20; display: none;
@@ -123,10 +150,23 @@
   dialog::backdrop { background: rgba(0,0,0,.45); }
   .dlg-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
   .dlg-head h3 { margin: 0; font-size: 18px; }
+  .dlg-actions { display: flex; align-items: center; gap: 8px; }
   .close {
     font: inherit; font-size: 20px; line-height: 1; background: none; border: 0;
     color: var(--text-secondary); cursor: pointer; padding: 4px 8px;
   }
+  .readout {
+    display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px;
+    margin: 14px 0 8px; min-height: 58px;
+  }
+  .readout .level { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .readout .level small { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+  .readout .ret { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .readout .ret .when { font-weight: 400; color: var(--text-secondary); }
+  .readout .side { text-align: right; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .readout .side b { color: var(--text-primary); font-weight: 600; }
+  .dlg-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  #dlg-chart svg { user-select: none; touch-action: none; }
   dialog svg text { font-size: 11px; }
   details { margin-top: 12px; }
   summary { cursor: pointer; color: var(--text-secondary); }
@@ -144,6 +184,10 @@
   <p class="sub" id="subtitle"></p>
 
   <div class="controls">
+    <div class="control">
+      <span>Period</span>
+      <div class="ranges" role="group" aria-label="Time period"></div>
+    </div>
     <label class="control">
       <span>Metric</span>
       <select id="metric"></select>
@@ -177,9 +221,14 @@
       <h3 id="dlg-title"></h3>
       <div class="card-meta" id="dlg-meta"></div>
     </div>
-    <button class="close" id="dlg-close" aria-label="Close">✕</button>
+    <div class="dlg-actions">
+      <div class="ranges" role="group" aria-label="Time period"></div>
+      <button class="close" id="dlg-close" aria-label="Close" autofocus>✕</button>
+    </div>
   </div>
+  <div class="readout" id="dlg-readout"></div>
   <div id="dlg-chart"></div>
+  <div class="dlg-hint">Drag across the chart to see the return between two points. Click to clear.</div>
   <details>
     <summary>Session table</summary>
     <div class="table-wrap"><table id="dlg-table"></table></div>
@@ -193,6 +242,7 @@ const MIN_SESSIONS = 8;           // exercises logged less often are not charted
 const BRZYCKI_MAX_REPS = 12;      // Brzycki is meaningless at high reps
 const GAP_DAYS = 60;              // a break longer than this splits the trend line
 const SPLITS = [["torso", "Torso"], ["arms", "Arms"], ["legs", "Legs"]];
+const RANGES = [["1M", "1M"], ["3M", "3M"], ["6M", "6M"], ["YTD", "YTD"], ["1Y", "1Y"], ["ALL", "All"]];
 
 // Each metric scores a single set; `session` says how sets combine into one number.
 const METRICS = {
@@ -210,7 +260,7 @@ const METRICS = {
               hint: "Heaviest weight lifted in the session (set weights don't apply)." },
 };
 
-const state = { metric: "epley", setWeights: [1, 0.7, 0.5, 0.35], window: 5 };
+const state = { metric: "epley", setWeights: [1, 0.7, 0.5, 0.35], window: 5, range: "ALL" };
 
 // ---------- computation ----------
 function sessionScore(sets, metric) {
@@ -227,6 +277,8 @@ function sessionScore(sets, metric) {
   return den > 0 ? num / den : null;
 }
 
+// Full history, with rolling average. Computed over everything so the average is
+// already warmed up at the start of a shorter period.
 function series(ex) {
   const pts = ex.sessions
     .map(s => ({ date: new Date(s.date + "T00:00:00"), raw: s.raw, sets: s.sets, v: sessionScore(s.sets, state.metric) }))
@@ -242,10 +294,65 @@ function series(ex) {
   return pts;
 }
 
+// ---------- time periods ----------
+const ALL_DATES = DATA.exercises.flatMap(e => e.sessions.map(s => new Date(s.date + "T00:00:00")));
+const FIRST = new Date(Math.min(...ALL_DATES)), LAST = new Date(Math.max(...ALL_DATES));
+
+function rangeStart(range) {
+  const d = new Date(LAST);
+  switch (range) {
+    case "1M": d.setMonth(d.getMonth() - 1); return d;
+    case "3M": d.setMonth(d.getMonth() - 3); return d;
+    case "6M": d.setMonth(d.getMonth() - 6); return d;
+    case "1Y": d.setFullYear(d.getFullYear() - 1); return d;
+    case "YTD": return new Date(LAST.getFullYear(), 0, 1);
+    default: return null;
+  }
+}
+
+function xDomain() {
+  const s = rangeStart(state.range);
+  if (!s) {
+    const a = new Date(FIRST), b = new Date(LAST);
+    a.setDate(1); b.setMonth(b.getMonth() + 1, 1);
+    return [a, b];
+  }
+  const b = new Date(LAST);
+  b.setDate(b.getDate() + Math.max(1, Math.round((LAST - s) / 864e5 * 0.02)));
+  return [s, b];
+}
+
+// The session points inside the selected period, plus the level the period is measured from:
+// the last rolling average before the period (like a stock's previous close), or the first
+// full-window average for "All".
+function periodView(all) {
+  const s = rangeStart(state.range);
+  const pts = s ? all.filter(p => p.date >= s) : all;
+  if (!pts.length) return { pts, base: null };
+  let base;
+  if (!s) base = all[Math.min(all.length - 1, state.window - 1)].avg;
+  else {
+    const before = all.filter(p => p.date < s);
+    base = before.length ? before[before.length - 1].avg : pts[0].avg;
+  }
+  return { pts, base };
+}
+
+const rangeLabel = () => RANGES.find(r => r[0] === state.range)[1];
+
 // ---------- formatting ----------
 const fmtDate = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-const fmtVal = v => v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(1);
+const fmtShort = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+const fmtVal = v => Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(1);
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function retHtml(from, to, { abs = false } = {}) {
+  const diff = to - from, pct = diff / from * 100;
+  const cls = pct > 0.5 ? "up" : pct < -0.5 ? "down" : "";
+  const sign = diff >= 0 ? "+" : "−";
+  const absPart = abs ? `${sign}${fmtVal(Math.abs(diff))} ${METRICS[state.metric].unit} ` : "";
+  return `<span class="delta ${cls}">${absPart}${abs ? "(" : ""}${sign}${Math.abs(pct).toFixed(1)}%${abs ? ")" : ""}</span>`;
+}
 
 function niceTicks(lo, hi, count) {
   const span = hi - lo || 1;
@@ -257,12 +364,25 @@ function niceTicks(lo, hi, count) {
   return ticks;
 }
 
-// ---------- chart ----------
-const ALL_DATES = DATA.exercises.flatMap(e => e.sessions.map(s => new Date(s.date + "T00:00:00")));
-const X_MIN = new Date(Math.min(...ALL_DATES)), X_MAX = new Date(Math.max(...ALL_DATES));
-X_MIN.setDate(1);
-X_MAX.setMonth(X_MAX.getMonth() + 1, 1);
+function xTicks(d0, d1, large) {
+  const days = (d1 - d0) / 864e5;
+  const ticks = [];
+  if (days <= 100) {
+    const step = days <= 40 ? 7 : large ? 14 : 28;
+    for (let d = new Date(d0); d <= d1; d.setDate(d.getDate() + step)) ticks.push([new Date(d), fmtShort(d)]);
+    return ticks;
+  }
+  const every = days <= 200 ? 1 : large ? 1 : days <= 400 ? 2 : 3;
+  const d = new Date(d0.getFullYear(), d0.getMonth(), 1);
+  if (d < d0) d.setMonth(d.getMonth() + 1);
+  for (; d <= d1; d.setMonth(d.getMonth() + 1)) {
+    if (d.getMonth() % every !== 0) continue;
+    ticks.push([new Date(d), d.getMonth() === 0 ? String(d.getFullYear()) : MONTHS[d.getMonth()]]);
+  }
+  return ticks;
+}
 
+// ---------- chart ----------
 const SVG_NS = "http://www.w3.org/2000/svg";
 function el(tag, attrs = {}, parent) {
   const e = document.createElementNS(SVG_NS, tag);
@@ -270,10 +390,11 @@ function el(tag, attrs = {}, parent) {
   if (parent) parent.appendChild(e);
   return e;
 }
+const show = (e, on) => e.setAttribute("visibility", on ? "visible" : "hidden");
 
-function drawChart(container, pts, { width, height, large }) {
+function drawChart(container, pts, { width, height, large, detail }) {
   container.innerHTML = "";
-  const pad = { l: 38, r: 8, t: 8, b: 20 };
+  const pad = { l: 42, r: 8, t: 8, b: large ? 24 : 20 };
   const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img" }, container);
   const iw = width - pad.l - pad.r, ih = height - pad.t - pad.b;
 
@@ -283,7 +404,8 @@ function drawChart(container, pts, { width, height, large }) {
   const yt = niceTicks(lo - padY, hi + padY, large ? 6 : 4);
   lo = Math.min(lo - padY, yt[0]); hi = Math.max(hi + padY, yt[yt.length - 1]);
 
-  const x = d => pad.l + (d - X_MIN) / (X_MAX - X_MIN) * iw;
+  const [d0, d1] = xDomain();
+  const x = d => pad.l + (d - d0) / (d1 - d0) * iw;
   const y = v => pad.t + (1 - (v - lo) / (hi - lo)) * ih;
 
   for (const t of yt) {
@@ -291,40 +413,92 @@ function drawChart(container, pts, { width, height, large }) {
     el("line", { class: "gridline", x1: pad.l, x2: width - pad.r, y1: y(t), y2: y(t) }, svg);
     el("text", { x: pad.l - 6, y: y(t) + 3, "text-anchor": "end" }, svg).textContent = fmtVal(t).replace(/\.0$/, "");
   }
-
-  // x ticks: quarters (or every month when large)
-  const step = large ? 1 : 3;
-  for (let d = new Date(X_MIN); d <= X_MAX; d.setMonth(d.getMonth() + 1)) {
-    if (d.getMonth() % step !== 0) continue;
-    const label = d.getMonth() === 0 ? String(d.getFullYear()) : MONTHS[d.getMonth()];
-    el("text", { x: x(d), y: height - 4, "text-anchor": "middle" }, svg).textContent = label;
+  for (const [d, label] of xTicks(d0, d1, large)) {
+    el("text", { x: x(d), y: height - 4 - (large ? 4 : 0), "text-anchor": "middle" }, svg).textContent = label;
   }
+
+  const sel = el("rect", { class: "sel", y: pad.t, height: ih, visibility: "hidden" }, svg);
+  const selEdges = [0, 1].map(() => el("line", { class: "sel-edge", y1: pad.t, y2: pad.t + ih, visibility: "hidden" }, svg));
 
   const dotR = large ? 3.5 : 2.5;
   for (const p of pts) el("circle", { class: "pt", cx: x(p.date), cy: y(p.v), r: dotR }, svg);
-  el("path", { class: "trend", d: pts.map(p => `${p.newSegment ? "M" : "L"}${x(p.date).toFixed(1)},${y(p.avg).toFixed(1)}`).join("") }, svg);
+  el("path", { class: "trend", d: pts.map((p, i) => `${p.newSegment || i === 0 ? "M" : "L"}${x(p.date).toFixed(1)},${y(p.avg).toFixed(1)}`).join("") }, svg);
 
-  // hover layer
   const cross = el("line", { class: "crosshair", y1: pad.t, y2: pad.t + ih, visibility: "hidden" }, svg);
   const hot = el("circle", { class: "pt active", r: dotR + 2, visibility: "hidden" }, svg);
   const hit = el("rect", { x: pad.l, y: 0, width: iw, height, fill: "transparent" }, svg);
-  hit.addEventListener("mousemove", ev => {
-    const r = svg.getBoundingClientRect();
-    const mx = (ev.clientX - r.left) / r.width * width;
-    let best = pts[0];
-    for (const p of pts) if (Math.abs(x(p.date) - mx) < Math.abs(x(best.date) - mx)) best = p;
-    cross.setAttribute("x1", x(best.date)); cross.setAttribute("x2", x(best.date));
-    hot.setAttribute("cx", x(best.date)); hot.setAttribute("cy", y(best.v));
-    cross.setAttribute("visibility", "visible"); hot.setAttribute("visibility", "visible");
-    showTip(ev, best);
+
+  const toLocalX = ev => { const r = svg.getBoundingClientRect(); return (ev.clientX - r.left) / r.width * width; };
+  const nearest = mx => pts.reduce((best, p) => Math.abs(x(p.date) - mx) < Math.abs(x(best.date) - mx) ? p : best, pts[0]);
+  const placeCursor = p => {
+    cross.setAttribute("x1", x(p.date)); cross.setAttribute("x2", x(p.date));
+    hot.setAttribute("cx", x(p.date)); hot.setAttribute("cy", detail ? y(p.avg) : y(p.v));
+    show(cross, true); show(hot, true);
+  };
+  const hideCursor = () => { show(cross, false); show(hot, false); };
+
+  if (!detail) {
+    hit.addEventListener("mousemove", ev => { const p = nearest(toLocalX(ev)); placeCursor(p); showTip(ev, p); });
+    hit.addEventListener("mouseleave", () => { hideCursor(); hideTip(); });
+    return;
+  }
+
+  // ----- detail chart: price tags on the axes, readout, drag-to-measure -----
+  const tagY = el("g", { class: "tag-y", visibility: "hidden" }, svg);
+  const tagYRect = el("rect", { x: 0, width: pad.l - 2, height: 18, rx: 3 }, tagY);
+  const tagYText = el("text", { x: (pad.l - 2) / 2, "text-anchor": "middle" }, tagY);
+  const tagX = el("g", { class: "tag-x", visibility: "hidden" }, svg);
+  const tagXRect = el("rect", { y: height - pad.b + 2, width: 92, height: 18, rx: 3 }, tagX);
+  const tagXText = el("text", { y: height - pad.b + 15, "text-anchor": "middle" }, tagX);
+
+  const placeTags = p => {
+    const ty = Math.max(pad.t, Math.min(pad.t + ih - 18, y(p.avg) - 9));
+    tagYRect.setAttribute("y", ty);
+    tagYText.setAttribute("y", ty + 13);
+    tagYText.textContent = fmtVal(p.avg);
+    const tx = Math.max(pad.l + 46, Math.min(width - pad.r - 46, x(p.date)));
+    tagXRect.setAttribute("x", tx - 46);
+    tagXText.setAttribute("x", tx);
+    tagXText.textContent = fmtDate(p.date);
+    show(tagY, true); show(tagX, true);
+  };
+
+  let dragFrom = null, moved = false, selection = null;
+  const drawSelection = (a, b) => {
+    const [l, r] = [x(a.date), x(b.date)].sort((m, n) => m - n);
+    sel.setAttribute("x", l); sel.setAttribute("width", Math.max(1, r - l));
+    selEdges[0].setAttribute("x1", l); selEdges[0].setAttribute("x2", l);
+    selEdges[1].setAttribute("x1", r); selEdges[1].setAttribute("x2", r);
+    [sel, ...selEdges].forEach(e => show(e, true));
+  };
+  const clearSelection = () => { selection = null; [sel, ...selEdges].forEach(e => show(e, false)); };
+
+  hit.addEventListener("pointerdown", ev => {
+    hit.setPointerCapture(ev.pointerId);
+    dragFrom = nearest(toLocalX(ev)); moved = false;
   });
-  hit.addEventListener("mouseleave", () => {
-    cross.setAttribute("visibility", "hidden"); hot.setAttribute("visibility", "hidden");
-    hideTip();
+  hit.addEventListener("pointermove", ev => {
+    const p = nearest(toLocalX(ev));
+    placeCursor(p); placeTags(p);
+    if (dragFrom && p !== dragFrom) {
+      moved = true;
+      selection = dragFrom.date < p.date ? [dragFrom, p] : [p, dragFrom];
+      drawSelection(...selection);
+    }
+    renderReadout({ hover: p, selection });
+  });
+  hit.addEventListener("pointerup", () => {
+    if (dragFrom && !moved) clearSelection();
+    dragFrom = null;
+  });
+  hit.addEventListener("pointerleave", () => {
+    if (dragFrom) return;
+    hideCursor(); show(tagY, false); show(tagX, false);
+    renderReadout({ selection });
   });
 }
 
-// ---------- tooltip ----------
+// ---------- tooltip (small charts) ----------
 const tip = document.getElementById("tip");
 function showTip(ev, p) {
   const m = METRICS[state.metric];
@@ -343,15 +517,6 @@ function showTip(ev, p) {
 function hideTip() { tip.style.display = "none"; }
 
 // ---------- cards ----------
-function deltaHtml(pts) {
-  if (pts.length < 2) return "";
-  const first = pts[Math.min(pts.length - 1, state.window - 1)].avg;
-  const last = pts[pts.length - 1].avg;
-  const pct = (last - first) / first * 100;
-  const cls = pct > 0.5 ? "up" : pct < -0.5 ? "down" : "";
-  return `<span class="delta ${cls}">${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%</span>`;
-}
-
 function render() {
   const m = METRICS[state.metric];
   document.getElementById("metric-hint").textContent = m.hint;
@@ -366,44 +531,95 @@ function render() {
     const grid = document.createElement("div"); grid.className = "grid"; root.appendChild(grid);
 
     for (const ex of exs) {
-      const pts = series(ex);
-      if (!pts.length) continue;
+      const { pts, base } = periodView(series(ex));
       const card = document.createElement("div");
       card.className = "card";
-      card.tabIndex = 0;
+      grid.appendChild(card);
+      if (!pts.length) {
+        card.classList.add("empty");
+        card.innerHTML = `
+          <div class="card-head"><span class="card-title">${ex.name}</span><span class="card-stat">—</span></div>
+          <div class="card-meta">0 sessions</div>
+          <div class="no-data">No trading activity in this period</div>`;
+        continue;
+      }
       const last = pts[pts.length - 1];
+      card.tabIndex = 0;
       card.innerHTML = `
         <div class="card-head">
           <span class="card-title">${ex.name}</span>
-          <span class="card-stat">${fmtVal(last.avg)} ${m.unit} · ${deltaHtml(pts)}</span>
+          <span class="card-stat">${fmtVal(last.avg)} ${m.unit} · ${rangeLabel()} ${retHtml(base, last.avg)}</span>
         </div>
         <div class="card-meta">${pts.length} sessions${ex.bodyweight ? ` · incl. ${DATA.bodyweight} kg bodyweight` : ""}</div>
         <div class="chart"></div>`;
       drawChart(card.querySelector(".chart"), pts, { width: 300, height: 150, large: false });
       card.addEventListener("click", () => openDetail(ex));
       card.addEventListener("keydown", ev => { if (ev.key === "Enter") openDetail(ex); });
-      grid.appendChild(card);
     }
   }
 }
 
 // ---------- detail dialog ----------
 const dlg = document.getElementById("dlg");
-let detailEx = null;
+let detail = null;   // { ex, pts, base, all }
+
 function openDetail(ex) {
-  detailEx = ex;
+  detail = { ex };
   renderDetail();
   hideTip();
   if (!dlg.open) dlg.showModal();
 }
-function renderDetail() {
-  if (!detailEx) return;
+
+function monthHighLow(p) {
+  const same = detail.all.filter(q => q.date.getFullYear() === p.date.getFullYear() && q.date.getMonth() === p.date.getMonth());
+  return { label: `${MONTHS[p.date.getMonth()]} ${p.date.getFullYear()}`, hi: Math.max(...same.map(q => q.v)), lo: Math.min(...same.map(q => q.v)) };
+}
+
+// The ticker-style line above the chart. Shows the latest level by default, the hovered
+// point while the cursor is on the chart, and the return across a dragged selection.
+function renderReadout({ hover = null, selection = null } = {}) {
+  const box = document.getElementById("dlg-readout");
+  if (!detail || !detail.pts.length) { box.innerHTML = ""; return; }
   const m = METRICS[state.metric];
-  const pts = series(detailEx);
-  document.getElementById("dlg-title").textContent = `${detailEx.name} — ${m.label}`;
-  document.getElementById("dlg-meta").innerHTML =
-    `${pts.length} sessions · latest ${state.window}-session avg ${fmtVal(pts[pts.length - 1].avg)} ${m.unit} · change since start ${deltaHtml(pts)}`;
-  drawChart(document.getElementById("dlg-chart"), pts, { width: 1000, height: 420, large: true });
+  const { pts, base } = detail;
+  // Big number: selection end if there is one, else the hovered point, else the latest.
+  // Side details always follow the cursor.
+  const p = selection ? selection[1] : hover || pts[pts.length - 1];
+  const s = hover || p;
+
+  let ret;
+  if (selection) {
+    const [a, b] = selection;
+    ret = `${retHtml(a.avg, b.avg, { abs: true })} <span class="when">${fmtShort(a.date)} → ${fmtDate(b.date)}</span>`;
+  } else {
+    const when = hover ? `${rangeLabel() === "All" ? "since start" : rangeLabel()} → ${fmtDate(p.date)}` : rangeLabel() === "All" ? "all time" : rangeLabel();
+    ret = `${retHtml(base, p.avg, { abs: true })} <span class="when">${when}</span>`;
+  }
+
+  const mo = monthHighLow(s);
+  box.innerHTML = `
+    <div>
+      <div class="level">${fmtVal(p.avg)} <small>${m.unit} · ${state.window}-session avg</small></div>
+      <div class="ret">${ret}</div>
+    </div>
+    <div class="side">
+      <div>${hover || selection ? "" : "Latest · "}<b>${fmtDate(s.date)}</b> · session <b>${fmtVal(s.v)}</b> · <span style="font-family:ui-monospace,Consolas,monospace">${s.raw}</span></div>
+      <div>${mo.label} high <b>${fmtVal(mo.hi)}</b> · low <b>${fmtVal(mo.lo)}</b></div>
+    </div>`;
+}
+
+function renderDetail() {
+  if (!detail) return;
+  const m = METRICS[state.metric];
+  const all = series(detail.ex);
+  Object.assign(detail, { all }, periodView(all));
+  const { ex, pts } = detail;
+  document.getElementById("dlg-title").textContent = `${ex.name} — ${m.label}`;
+  document.getElementById("dlg-meta").textContent = `${pts.length} sessions in period`;
+  const chart = document.getElementById("dlg-chart");
+  if (pts.length) drawChart(chart, pts, { width: 1000, height: 420, large: true, detail: true });
+  else chart.innerHTML = `<div class="no-data" style="height:420px">No trading activity in this period</div>`;
+  renderReadout();
   document.getElementById("dlg-table").innerHTML =
     `<thead><tr><th>Date</th><th>Logged</th><th class="num">${m.label}</th><th class="num">Rolling avg</th></tr></thead><tbody>` +
     pts.slice().reverse().map(p =>
@@ -412,29 +628,45 @@ function renderDetail() {
 }
 document.getElementById("dlg-close").addEventListener("click", () => dlg.close());
 dlg.addEventListener("click", ev => { if (ev.target === dlg) dlg.close(); });
-dlg.addEventListener("close", () => { detailEx = null; hideTip(); });
+dlg.addEventListener("close", () => { detail = null; hideTip(); });
 
 // ---------- controls ----------
+function rerender() { render(); renderDetail(); }
+
+document.querySelectorAll(".ranges").forEach(group => {
+  for (const [key, label] of RANGES) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label; b.dataset.range = key;
+    b.addEventListener("click", () => {
+      state.range = key;
+      document.querySelectorAll(".ranges button").forEach(o => o.setAttribute("aria-pressed", o.dataset.range === key));
+      rerender();
+    });
+    b.setAttribute("aria-pressed", key === state.range);
+    group.appendChild(b);
+  }
+});
+
 const metricSel = document.getElementById("metric");
 for (const [k, m] of Object.entries(METRICS)) metricSel.add(new Option(m.label, k));
 metricSel.value = state.metric;
-metricSel.addEventListener("change", () => { state.metric = metricSel.value; render(); renderDetail(); });
+metricSel.addEventListener("change", () => { state.metric = metricSel.value; rerender(); });
 
 document.querySelectorAll(".weights input").forEach((inp, i) => {
   inp.addEventListener("input", () => {
     const v = parseFloat(inp.value);
-    if (!isNaN(v) && v >= 0) { state.setWeights[i] = v; render(); renderDetail(); }
+    if (!isNaN(v) && v >= 0) { state.setWeights[i] = v; rerender(); }
   });
 });
 document.getElementById("window").addEventListener("input", ev => {
   const v = parseInt(ev.target.value, 10);
-  if (v >= 1) { state.window = v; render(); renderDetail(); }
+  if (v >= 1) { state.window = v; rerender(); }
 });
 
 // ---------- header / footer ----------
 const total = DATA.exercises.reduce((a, e) => a + e.sessions.length, 0);
 document.getElementById("subtitle").textContent =
-  `${fmtDate(new Date(Math.min(...ALL_DATES)))} – ${fmtDate(new Date(Math.max(...ALL_DATES)))} · ${total} logged exercises. Dots are sessions, the line is the rolling average. Click a chart to enlarge.`;
+  `${fmtDate(FIRST)} – ${fmtDate(LAST)} · ${total} logged exercises. Dots are sessions, the line is the rolling average. Click a chart to enlarge.`;
 const hidden = DATA.exercises.filter(e => e.sessions.length < MIN_SESSIONS).map(e => e.name);
 document.getElementById("footer").innerHTML =
   (hidden.length ? `Not charted (fewer than ${MIN_SESSIONS} sessions): ${hidden.join(", ")}.<br>` : "") +
