@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strength Progress</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f4f2;
+    --surface-1: #fcfcfb;
+    --border: #e2e1dc;
+    --grid: #ebeae6;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #85847e;
+    --series-1: #2a78d6;
+    --dot: rgba(42, 120, 214, 0.28);
+    --good: #1a7f37;
+    --bad: #c4352f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #111110;
+      --surface-1: #1a1a19;
+      --border: #2e2e2c;
+      --grid: #262624;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8a897f;
+      --series-1: #3987e5;
+      --dot: rgba(57, 135, 229, 0.35);
+      --good: #4cb86a;
+      --bad: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --border: #2e2e2c;
+    --grid: #262624;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8a897f;
+    --series-1: #3987e5;
+    --dot: rgba(57, 135, 229, 0.35);
+    --good: #4cb86a;
+    --bad: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--text-secondary); margin: 0 0 20px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: end;
+    padding: 14px 16px; margin-bottom: 24px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .control { display: flex; flex-direction: column; gap: 4px; }
+  .control > span { font-size: 12px; color: var(--text-secondary); }
+  .control select, .control input {
+    font: inherit; color: var(--text-primary); background: var(--surface-0);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+  }
+  .weights { display: flex; gap: 6px; }
+  .weights input { width: 58px; }
+  .control input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+  .hint { font-size: 12px; color: var(--text-muted); max-width: 320px; }
+
+  h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-secondary); margin: 28px 0 10px;
+  }
+  .grid {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 12px 6px; cursor: zoom-in; position: relative; min-width: 0;
+  }
+  .card:hover { border-color: var(--text-muted); }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card-title { font-weight: 600; }
+  .card-stat { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+  .delta.up { color: var(--good); }
+  .delta.down { color: var(--bad); }
+  .card-meta { font-size: 12px; color: var(--text-muted); }
+
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  svg text { fill: var(--text-muted); font-size: 10px; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .trend { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .pt { fill: var(--dot); }
+  .pt.active { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+  .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 2 3; }
+
+  #tip {
+    position: fixed; pointer-events: none; z-index: 20; display: none;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15); padding: 8px 10px; font-size: 12px; max-width: 260px;
+  }
+  #tip .tip-date { color: var(--text-secondary); }
+  #tip .tip-raw { font-family: ui-monospace, Consolas, monospace; margin: 2px 0 4px; }
+  #tip .tip-row { display: flex; justify-content: space-between; gap: 16px; }
+  #tip .tip-row b { font-variant-numeric: tabular-nums; }
+
+  dialog {
+    width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+    border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    background: var(--surface-1); color: var(--text-primary);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+  .dlg-head h3 { margin: 0; font-size: 18px; }
+  .close {
+    font: inherit; font-size: 20px; line-height: 1; background: none; border: 0;
+    color: var(--text-secondary); cursor: pointer; padding: 4px 8px;
+  }
+  dialog svg text { font-size: 11px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--text-secondary); }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 8px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--grid); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.mono { font-family: ui-monospace, Consolas, monospace; }
+  .table-wrap { max-height: 320px; overflow: auto; }
+  footer { margin-top: 32px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Strength progress</h1>
+  <p class="sub" id="subtitle"></p>
+
+  <div class="controls">
+    <label class="control">
+      <span>Metric</span>
+      <select id="metric"></select>
+    </label>
+    <div class="control">
+      <span>Set weights (1st, 2nd, 3rd, 4th+)</span>
+      <div class="weights">
+        <input type="number" step="0.05" min="0" max="1" value="1" aria-label="Set 1 weight">
+        <input type="number" step="0.05" min="0" max="1" value="0.7" aria-label="Set 2 weight">
+        <input type="number" step="0.05" min="0" max="1" value="0.5" aria-label="Set 3 weight">
+        <input type="number" step="0.05" min="0" max="1" value="0.35" aria-label="Set 4+ weight">
+      </div>
+    </div>
+    <label class="control">
+      <span>Rolling average (sessions)</span>
+      <input type="number" id="window" min="1" max="30" value="5" style="width:72px">
+    </label>
+    <p class="hint" id="metric-hint"></p>
+  </div>
+
+  <div id="sections"></div>
+
+  <footer id="footer"></footer>
+</main>
+
+<div id="tip" role="tooltip"></div>
+
+<dialog id="dlg">
+  <div class="dlg-head">
+    <div>
+      <h3 id="dlg-title"></h3>
+      <div class="card-meta" id="dlg-meta"></div>
+    </div>
+    <button class="close" id="dlg-close" aria-label="Close">✕</button>
+  </div>
+  <div id="dlg-chart"></div>
+  <details>
+    <summary>Session table</summary>
+    <div class="table-wrap"><table id="dlg-table"></table></div>
+  </details>
+</dialog>
+
+<script src="data.js"></script>
+<script>
+const DATA = window.WORKOUT_DATA;
+const MIN_SESSIONS = 8;           // exercises logged less often are not charted
+const BRZYCKI_MAX_REPS = 12;      // Brzycki is meaningless at high reps
+const GAP_DAYS = 60;              // a break longer than this splits the trend line
+const SPLITS = [["torso", "Torso"], ["arms", "Arms"], ["legs", "Legs"]];
+
+// Each metric scores a single set; `session` says how sets combine into one number.
+const METRICS = {
+  epley:    { label: "Epley 1RM",    unit: "kg", set: (w, r) => w * (1 + r / 30), session: "weighted",
+              hint: "Estimated 1-rep max: w × (1 + r/30)." },
+  brzycki:  { label: "Brzycki 1RM",  unit: "kg", set: (w, r) => r <= BRZYCKI_MAX_REPS ? w * 36 / (37 - r) : null, session: "weighted",
+              hint: `Estimated 1-rep max: w × 36/(37 − r). Sets above ${BRZYCKI_MAX_REPS} reps are skipped.` },
+  lombardi: { label: "Lombardi 1RM", unit: "kg", set: (w, r) => w * Math.pow(r, 0.1), session: "weighted",
+              hint: "Estimated 1-rep max: w × r^0.10. Gentle on high reps." },
+  oconner:  { label: "O'Conner 1RM", unit: "kg", set: (w, r) => w * (1 + r / 40), session: "weighted",
+              hint: "Estimated 1-rep max: w × (1 + r/40)." },
+  volume:   { label: "Volume",       unit: "kg", set: (w, r) => w * r, session: "sum",
+              hint: "Total w × r across all sets in the session (set weights don't apply)." },
+  top:      { label: "Top weight",   unit: "kg", set: (w, r) => w, session: "max",
+              hint: "Heaviest weight lifted in the session (set weights don't apply)." },
+};
+
+const state = { metric: "epley", setWeights: [1, 0.7, 0.5, 0.35], window: 5 };
+
+// ---------- computation ----------
+function sessionScore(sets, metric) {
+  const m = METRICS[metric];
+  const scores = sets.map(([w, r]) => m.set(w, r));
+  if (m.session === "sum") return scores.reduce((a, b) => a + b, 0);
+  if (m.session === "max") return Math.max(...scores);
+  let num = 0, den = 0;
+  scores.forEach((s, i) => {
+    if (s == null) return;
+    const wt = state.setWeights[Math.min(i, state.setWeights.length - 1)];
+    num += wt * s; den += wt;
+  });
+  return den > 0 ? num / den : null;
+}
+
+function series(ex) {
+  const pts = ex.sessions
+    .map(s => ({ date: new Date(s.date + "T00:00:00"), raw: s.raw, sets: s.sets, v: sessionScore(s.sets, state.metric) }))
+    .filter(p => p.v != null && isFinite(p.v));
+  // A long break starts a new segment: the line breaks and the rolling average restarts.
+  let segStart = 0;
+  pts.forEach((p, i) => {
+    if (i > 0 && (p.date - pts[i - 1].date) / 864e5 > GAP_DAYS) segStart = i;
+    p.newSegment = i === segStart;
+    const slice = pts.slice(Math.max(segStart, i - state.window + 1), i + 1);
+    p.avg = slice.reduce((a, q) => a + q.v, 0) / slice.length;
+  });
+  return pts;
+}
+
+// ---------- formatting ----------
+const fmtDate = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const fmtVal = v => v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(1);
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function niceTicks(lo, hi, count) {
+  const span = hi - lo || 1;
+  const step0 = span / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => s >= step0);
+  const ticks = [];
+  for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(t);
+  return ticks;
+}
+
+// ---------- chart ----------
+const ALL_DATES = DATA.exercises.flatMap(e => e.sessions.map(s => new Date(s.date + "T00:00:00")));
+const X_MIN = new Date(Math.min(...ALL_DATES)), X_MAX = new Date(Math.max(...ALL_DATES));
+X_MIN.setDate(1);
+X_MAX.setMonth(X_MAX.getMonth() + 1, 1);
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function drawChart(container, pts, { width, height, large }) {
+  container.innerHTML = "";
+  const pad = { l: 38, r: 8, t: 8, b: 20 };
+  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img" }, container);
+  const iw = width - pad.l - pad.r, ih = height - pad.t - pad.b;
+
+  const vals = pts.flatMap(p => [p.v, p.avg]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const padY = (hi - lo) * 0.08 || hi * 0.05 || 1;
+  const yt = niceTicks(lo - padY, hi + padY, large ? 6 : 4);
+  lo = Math.min(lo - padY, yt[0]); hi = Math.max(hi + padY, yt[yt.length - 1]);
+
+  const x = d => pad.l + (d - X_MIN) / (X_MAX - X_MIN) * iw;
+  const y = v => pad.t + (1 - (v - lo) / (hi - lo)) * ih;
+
+  for (const t of yt) {
+    if (t < lo || t > hi) continue;
+    el("line", { class: "gridline", x1: pad.l, x2: width - pad.r, y1: y(t), y2: y(t) }, svg);
+    el("text", { x: pad.l - 6, y: y(t) + 3, "text-anchor": "end" }, svg).textContent = fmtVal(t).replace(/\.0$/, "");
+  }
+
+  // x ticks: quarters (or every month when large)
+  const step = large ? 1 : 3;
+  for (let d = new Date(X_MIN); d <= X_MAX; d.setMonth(d.getMonth() + 1)) {
+    if (d.getMonth() % step !== 0) continue;
+    const label = d.getMonth() === 0 ? String(d.getFullYear()) : MONTHS[d.getMonth()];
+    el("text", { x: x(d), y: height - 4, "text-anchor": "middle" }, svg).textContent = label;
+  }
+
+  const dotR = large ? 3.5 : 2.5;
+  for (const p of pts) el("circle", { class: "pt", cx: x(p.date), cy: y(p.v), r: dotR }, svg);
+  el("path", { class: "trend", d: pts.map(p => `${p.newSegment ? "M" : "L"}${x(p.date).toFixed(1)},${y(p.avg).toFixed(1)}`).join("") }, svg);
+
+  // hover layer
+  const cross = el("line", { class: "crosshair", y1: pad.t, y2: pad.t + ih, visibility: "hidden" }, svg);
+  const hot = el("circle", { class: "pt active", r: dotR + 2, visibility: "hidden" }, svg);
+  const hit = el("rect", { x: pad.l, y: 0, width: iw, height, fill: "transparent" }, svg);
+  hit.addEventListener("mousemove", ev => {
+    const r = svg.getBoundingClientRect();
+    const mx = (ev.clientX - r.left) / r.width * width;
+    let best = pts[0];
+    for (const p of pts) if (Math.abs(x(p.date) - mx) < Math.abs(x(best.date) - mx)) best = p;
+    cross.setAttribute("x1", x(best.date)); cross.setAttribute("x2", x(best.date));
+    hot.setAttribute("cx", x(best.date)); hot.setAttribute("cy", y(best.v));
+    cross.setAttribute("visibility", "visible"); hot.setAttribute("visibility", "visible");
+    showTip(ev, best);
+  });
+  hit.addEventListener("mouseleave", () => {
+    cross.setAttribute("visibility", "hidden"); hot.setAttribute("visibility", "hidden");
+    hideTip();
+  });
+}
+
+// ---------- tooltip ----------
+const tip = document.getElementById("tip");
+function showTip(ev, p) {
+  const m = METRICS[state.metric];
+  tip.innerHTML = `
+    <div class="tip-date">${fmtDate(p.date)}</div>
+    <div class="tip-raw">${p.raw}</div>
+    <div class="tip-row"><span>${m.label}</span><b>${fmtVal(p.v)} ${m.unit}</b></div>
+    <div class="tip-row"><span>${state.window}-session avg</span><b>${fmtVal(p.avg)} ${m.unit}</b></div>`;
+  tip.style.display = "block";
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let left = ev.clientX + 14, top = ev.clientY + 14;
+  if (left + w > window.innerWidth - 8) left = ev.clientX - w - 14;
+  if (top + h > window.innerHeight - 8) top = ev.clientY - h - 14;
+  tip.style.left = left + "px"; tip.style.top = top + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+
+// ---------- cards ----------
+function deltaHtml(pts) {
+  if (pts.length < 2) return "";
+  const first = pts[Math.min(pts.length - 1, state.window - 1)].avg;
+  const last = pts[pts.length - 1].avg;
+  const pct = (last - first) / first * 100;
+  const cls = pct > 0.5 ? "up" : pct < -0.5 ? "down" : "";
+  return `<span class="delta ${cls}">${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%</span>`;
+}
+
+function render() {
+  const m = METRICS[state.metric];
+  document.getElementById("metric-hint").textContent = m.hint;
+  const root = document.getElementById("sections");
+  root.innerHTML = "";
+  const charted = DATA.exercises.filter(e => e.sessions.length >= MIN_SESSIONS);
+
+  for (const [split, label] of SPLITS) {
+    const exs = charted.filter(e => e.split === split).sort((a, b) => b.sessions.length - a.sessions.length);
+    if (!exs.length) continue;
+    const h = document.createElement("h2"); h.textContent = label; root.appendChild(h);
+    const grid = document.createElement("div"); grid.className = "grid"; root.appendChild(grid);
+
+    for (const ex of exs) {
+      const pts = series(ex);
+      if (!pts.length) continue;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.tabIndex = 0;
+      const last = pts[pts.length - 1];
+      card.innerHTML = `
+        <div class="card-head">
+          <span class="card-title">${ex.name}</span>
+          <span class="card-stat">${fmtVal(last.avg)} ${m.unit} · ${deltaHtml(pts)}</span>
+        </div>
+        <div class="card-meta">${pts.length} sessions${ex.bodyweight ? ` · incl. ${DATA.bodyweight} kg bodyweight` : ""}</div>
+        <div class="chart"></div>`;
+      drawChart(card.querySelector(".chart"), pts, { width: 300, height: 150, large: false });
+      card.addEventListener("click", () => openDetail(ex));
+      card.addEventListener("keydown", ev => { if (ev.key === "Enter") openDetail(ex); });
+      grid.appendChild(card);
+    }
+  }
+}
+
+// ---------- detail dialog ----------
+const dlg = document.getElementById("dlg");
+let detailEx = null;
+function openDetail(ex) {
+  detailEx = ex;
+  renderDetail();
+  hideTip();
+  if (!dlg.open) dlg.showModal();
+}
+function renderDetail() {
+  if (!detailEx) return;
+  const m = METRICS[state.metric];
+  const pts = series(detailEx);
+  document.getElementById("dlg-title").textContent = `${detailEx.name} — ${m.label}`;
+  document.getElementById("dlg-meta").innerHTML =
+    `${pts.length} sessions · latest ${state.window}-session avg ${fmtVal(pts[pts.length - 1].avg)} ${m.unit} · change since start ${deltaHtml(pts)}`;
+  drawChart(document.getElementById("dlg-chart"), pts, { width: 1000, height: 420, large: true });
+  document.getElementById("dlg-table").innerHTML =
+    `<thead><tr><th>Date</th><th>Logged</th><th class="num">${m.label}</th><th class="num">Rolling avg</th></tr></thead><tbody>` +
+    pts.slice().reverse().map(p =>
+      `<tr><td>${fmtDate(p.date)}</td><td class="mono">${p.raw}</td><td class="num">${fmtVal(p.v)}</td><td class="num">${fmtVal(p.avg)}</td></tr>`).join("") +
+    "</tbody>";
+}
+document.getElementById("dlg-close").addEventListener("click", () => dlg.close());
+dlg.addEventListener("click", ev => { if (ev.target === dlg) dlg.close(); });
+dlg.addEventListener("close", () => { detailEx = null; hideTip(); });
+
+// ---------- controls ----------
+const metricSel = document.getElementById("metric");
+for (const [k, m] of Object.entries(METRICS)) metricSel.add(new Option(m.label, k));
+metricSel.value = state.metric;
+metricSel.addEventListener("change", () => { state.metric = metricSel.value; render(); renderDetail(); });
+
+document.querySelectorAll(".weights input").forEach((inp, i) => {
+  inp.addEventListener("input", () => {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v) && v >= 0) { state.setWeights[i] = v; render(); renderDetail(); }
+  });
+});
+document.getElementById("window").addEventListener("input", ev => {
+  const v = parseInt(ev.target.value, 10);
+  if (v >= 1) { state.window = v; render(); renderDetail(); }
+});
+
+// ---------- header / footer ----------
+const total = DATA.exercises.reduce((a, e) => a + e.sessions.length, 0);
+document.getElementById("subtitle").textContent =
+  `${fmtDate(new Date(Math.min(...ALL_DATES)))} – ${fmtDate(new Date(Math.max(...ALL_DATES)))} · ${total} logged exercises. Dots are sessions, the line is the rolling average. Click a chart to enlarge.`;
+const hidden = DATA.exercises.filter(e => e.sessions.length < MIN_SESSIONS).map(e => e.name);
+document.getElementById("footer").innerHTML =
+  (hidden.length ? `Not charted (fewer than ${MIN_SESSIONS} sessions): ${hidden.join(", ")}.<br>` : "") +
+  (DATA.warnings.length ? `Parser skipped ${DATA.warnings.length} line(s): ${DATA.warnings.join("; ")}` : "All log lines parsed.");
+
+render();
+</script>
+</body>
+</html>
