@@ -23,11 +23,3 @@ The score is an estimated 1-rep max (or volume, or top weight; there's a dropdow
 **Legs: Sell.** The sector has been in a bear market since July 2025. *Squat* (−7%) and *Romanian Deadlift* (−8%) both peaked that summer and have been consolidating at lower levels for over a year, which is a polite way of saying they gave up. The exception is *Calf Raise*, up 213%, a gain the auditors have traced to a switch from dumbbells to a machine. Technically legal. *Leg Raise* is a machine and trades accordingly.
 
 **Watchlist.** *Push-Up* listed in August 2026 and went straight up on light volume, classic meme-stock behaviour. *Overhead Press* traded once and was never seen again.
-
-## Notes to future me
-
-- Log workouts in `data/Workout log YYYY.txt`. The format is in [parsing-info.md](parsing-info.md).
-- Run `python parse.py`, then commit and push `data.js`. The site updates by itself a minute later.
-- `parse.py` complains about lines it can't read. Listen to it.
-- Bodyweight is hardcoded at 78 kg, approximately, and selectively measured.
-- Exercises logged fewer than 8 times don't get a chart. Overhead press, I saw what you did.
